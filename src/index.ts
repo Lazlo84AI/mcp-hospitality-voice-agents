@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createClient } from '@supabase/supabase-js';
 import express from 'express';
 import { z } from 'zod';
@@ -730,9 +731,17 @@ app.get('/', (req, res) => {
   });
 });
 
-// Route POST /mcp - Point d'entrée MCP
-app.post('/mcp', async (req, res) => {
+// Route GET /mcp - Point d'entrée MCP avec SSE
+app.get('/mcp', async (req, res) => {
+  console.log('📡 Incoming SSE connection from Dust...');
+  
   try {
+    // Headers SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
     const mcpInstance = new HospitalityMCP({
       SUPABASE_URL: process.env.SUPABASE_URL!,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -742,13 +751,21 @@ app.post('/mcp', async (req, res) => {
 
     await mcpInstance.init();
 
-    // Gérer la requête MCP selon le SDK
-    const result = await mcpInstance.server.handleRequest(req.body);
-    res.json(result);
-    
+    // Transport SSE
+    const transport = new SSEServerTransport('/mcp', res);
+    await mcpInstance.server.connect(transport);
+
+    console.log('✅ SSE connection established with Dust');
+
+    req.on('close', () => {
+      console.log('🔌 Dust SSE connection closed');
+    });
+
   } catch (error: any) {
     console.error('❌ MCP Error:', error);
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 

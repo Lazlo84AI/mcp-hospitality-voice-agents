@@ -736,11 +736,6 @@ app.get('/mcp', async (req, res) => {
   console.log('📡 Incoming SSE connection from Dust...');
   
   try {
-    // Headers SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
 
     const mcpInstance = new HospitalityMCP({
       SUPABASE_URL: process.env.SUPABASE_URL!,

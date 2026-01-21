@@ -19,7 +19,7 @@ export class HospitalityMCP {
     version: "3.0.0",
     description: "MCP Server for HospitalityOS Voice Activity Reports"
   });
-
+}
 
   // ========================================
 // FONCTION : Envoyer un message à ElevenLabs via API REST HTTP

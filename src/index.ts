@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"; // ✅ CHANGEMENT 1
+import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js"; // ✅ CHANGEMENT 2
+import { randomUUID } from "crypto"; // ✅ CHANGEMENT 3
 import { createClient } from '@supabase/supabase-js';
-import express from 'express';
 import { z } from 'zod';
 
 export class HospitalityMCP {
@@ -13,61 +14,61 @@ export class HospitalityMCP {
     ELEVENLABS_AGENT_ID?: string;
   };
   server: McpServer; 
+  
   constructor(env: any) {
     this.env = env;
     this.server = new McpServer({
-    name: "mcp-hospitality",
-    version: "3.0.0",
-    description: "MCP Server for HospitalityOS Voice Activity Reports"
-  });
-}
+      name: "mcp-hospitality",
+      version: "3.0.0",
+      description: "MCP Server for HospitalityOS Voice Activity Reports"
+    });
+  }
 
   // ========================================
-// FONCTION : Envoyer un message à ElevenLabs via API REST HTTP
-// ========================================
-private async sendToElevenLabs(
-  message: string, 
-  conversationId: string,
-  apiKey: string, 
-  agentId: string
-): Promise<boolean> {
-  try {
-    console.log(`📤 Sending message to ElevenLabs (conversation: ${conversationId})...`);
+  // FONCTION : Envoyer un message à ElevenLabs via API REST HTTP
+  // ========================================
+  private async sendToElevenLabs(
+    message: string, 
+    conversationId: string,
+    apiKey: string, 
+    agentId: string
+  ): Promise<boolean> {
+    try {
+      console.log(`📤 Sending message to ElevenLabs (conversation: ${conversationId})...`);
 
-    // ✅ API REST ElevenLabs (pas WebSocket !)
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/send_message`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          agent_id: agentId,
-          conversation_id: conversationId,
-          message: message
-        }),
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/convai/conversation/send_message`,
+        {
+          method: "POST",
+          headers: {
+            "xi-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agent_id: agentId,
+            conversation_id: conversationId,
+            message: message
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ ElevenLabs API error:", response.status, errorText);
+        return false;
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ ElevenLabs API error:", response.status, errorText);
+      const result = await response.json();
+      console.log("✅ Message sent to ElevenLabs:", result);
+      return true;
+
+    } catch (err: any) {
+      console.error("❌ Failed to send to ElevenLabs:", err.message);
       return false;
     }
-
-    const result = await response.json();
-    console.log("✅ Message sent to ElevenLabs:", result);
-    return true;
-
-  } catch (err: any) {
-    console.error("❌ Failed to send to ElevenLabs:", err.message);
-    return false;
   }
-}
 
-async init() {
+  async init() {
     // 🔹 Initialisation Supabase
     const supabase = createClient(
       this.env.SUPABASE_URL,
@@ -100,7 +101,7 @@ async init() {
   private registerTestTool(supabase: any) {
     this.server.tool(
       "test_supabase",
-      "Test de connexion Supabase depuis le Worker Cloudflare",
+      "Test de connexion Supabase depuis le serveur Render",
       {},
       async () => {
         try {
@@ -288,7 +289,7 @@ async init() {
   }
 
   // ========================================
-  // OUTIL 4 : Vérifier l'identité du staff (par UUID uniquement)
+  // OUTIL 4 : Vérifier l'identité du staff
   // ========================================
   private registerVerifyStaffTool(supabase: any) {
     this.server.tool(
@@ -354,7 +355,7 @@ async init() {
   }
 
   // ========================================
-  // OUTIL 5 : Vérifier la localisation (par UUID uniquement)
+  // OUTIL 5 : Vérifier la localisation
   // ========================================
   private registerVerifyLocationTool(supabase: any) {
     this.server.tool(
@@ -419,7 +420,7 @@ async init() {
   }
 
   // ========================================
-  // OUTIL 6 : Demander une clarification + HTTP ElevenLabs
+  // OUTIL 6 : Demander une clarification
   // ========================================
   private registerAskClarificationTool(supabase: any) {
     this.server.tool(
@@ -437,16 +438,12 @@ async init() {
 
           const { question, suggestions = [], conversation_id } = params;
 
-          // Format la réponse pour ElevenLabs
           let formatted_response = question;
           
           if (suggestions.length > 0) {
             formatted_response += ` Options : ${suggestions.join(' ou ')}.`;
           }
 
-          // ========================================
-          // ENVOI À ELEVENLABS VIA API REST HTTP
-          // ========================================
           let elevenlabs_notified = false;
           if (this.env.ELEVENLABS_API_KEY && this.env.ELEVENLABS_AGENT_ID) {
             try {
@@ -463,7 +460,6 @@ async init() {
             console.warn("⚠️ ElevenLabs API key or agent ID missing");
           }
 
-          // Retourne la réponse à Dust
           return {
             content: [{
               type: "text",
@@ -498,7 +494,7 @@ async init() {
   }
 
   // ========================================
-  // OUTIL 7 : Créer une tâche (rapport)
+  // OUTIL 7 : Créer une tâche
   // ========================================
   private registerCreateTaskReportTool(supabase: any) {
     this.server.tool(
@@ -525,9 +521,6 @@ async init() {
         try {
           console.log("💾 Creating task report...");
 
-          // ========================================
-          // VALIDATION DES INPUTS
-          // ========================================
           if (!params.staff_id) {
             console.error("❌ Missing staff_id");
             return {
@@ -556,9 +549,6 @@ async init() {
             };
           }
 
-          // ========================================
-          // DÉTECTION DE DOUBLON (via conversation_id)
-          // ========================================
           if (params.conversation_id) {
             const { data: existingTask } = await supabase
               .from("task")
@@ -582,9 +572,6 @@ async init() {
             }
           }
 
-          // ========================================
-          // RÉCUPÉRATION DU NOM COMPLET DU STAFF
-          // ========================================
           const { data: staffData } = await supabase
             .from("staff_directory")
             .select("first_name, last_name, full_name")
@@ -595,32 +582,24 @@ async init() {
             ? `${staffData.first_name} ${staffData.last_name}`
             : "Staff inconnu";
 
-          // ========================================
-          // INSERTION DANS SUPABASE
-          // ========================================
           const { data, error } = await supabase
             .from("task")
             .insert({
-              // Champs obligatoires
               title: params.title,
               description: params.description,
               origin_type: "team",
               created_by: params.staff_id,
-              assigned_to: ["75d4096b-55b5-40c1-a593-0e7daecd8c64"], // Océane (chef gouvernantes)
+              assigned_to: ["75d4096b-55b5-40c1-a593-0e7daecd8c64"],
               location: params.location,
               location_id: params.location_id || null,
               category: params.category,
               priority: params.priority || "normal",
               service: "housekeeping",
               status: "pending",
-
-              // Champs optionnels
               guest_name: params.guest_name || null,
               voice_note_url: params.voice_note_url || null,
               voice_transcript: params.voice_transcript || params.description,
               voice_conversation_id: params.conversation_id || null,
-
-              // Métadonnées
               requires_validation: false,
               created_at: new Date().toISOString()
             })
@@ -643,9 +622,6 @@ async init() {
 
           console.log("✅ Task report created:", data.id);
 
-          // ========================================
-          // ENVOI À ELEVENLABS VIA API REST HTTP
-          // ========================================
           let elevenlabs_notified = false;
           if (params.conversation_id && this.env.ELEVENLABS_API_KEY && this.env.ELEVENLABS_AGENT_ID) {
             const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. L'équipe ${data.category === 'incident' ? 'maintenance' : 'housekeeping'} a été notifiée immédiatement. Bonne journée !`;
@@ -662,9 +638,6 @@ async init() {
             }
           }
 
-          // ========================================
-          // RETOUR ENRICHI AVEC TOUTES LES DONNÉES
-          // ========================================
           return {
             content: [{
               type: "text",
@@ -707,13 +680,39 @@ async init() {
 }
 
 // ========================================
-// SERVEUR EXPRESS POUR RENDER
+// INITIALISATION MCP & TRANSPORT
 // ========================================
-const app = express();
-app.use(express.json());
+const mcpInstance = new HospitalityMCP({
+  SUPABASE_URL: process.env.SUPABASE_URL!,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
+  ELEVENLABS_AGENT_ID: process.env.ELEVENLABS_AGENT_ID
+});
 
-// Route GET / - Health check
-app.get('/', (req, res) => {
+await mcpInstance.init();
+
+// ✅ CHANGEMENT 4 : Créer le transport StreamableHTTP
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: () => randomUUID(),
+});
+
+await mcpInstance.server.connect(transport);
+console.log("✅ MCP Server connected to StreamableHTTP transport");
+
+// ========================================
+// EXPRESS APP (AVEC HELPER OFFICIEL)
+// ========================================
+// ✅ CHANGEMENT 5 : Utiliser createMcpExpressApp au lieu de express()
+const app = createMcpExpressApp({
+  host: "0.0.0.0", // Pour Render
+});
+
+// ========================================
+// ROUTES
+// ========================================
+
+// Route GET / - Info
+app.get("/", (req, res) => {
   res.json({
     name: "mcp-hospitality",
     version: "3.0.0",
@@ -731,50 +730,18 @@ app.get('/', (req, res) => {
   });
 });
 
-// Route GET /mcp - Point d'entrée MCP avec SSE
-app.get('/mcp', async (req, res) => {
-  console.log('📡 Incoming SSE connection from Dust...');
-  
-  try {
-    const mcpInstance = new HospitalityMCP({
-      SUPABASE_URL: process.env.SUPABASE_URL!,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
-      ELEVENLABS_AGENT_ID: process.env.ELEVENLABS_AGENT_ID
-    });
-
-    await mcpInstance.init();
-
-    // Transport SSE
-    const transport = new SSEServerTransport('/mcp', res);
-    
-    // Keep connection alive - wait for close event
-    await new Promise<void>((resolve) => {
-      req.on('close', async () => {
-        console.log('🔌 Dust SSE connection closed');
-        await mcpInstance.server.close();
-        resolve();
-      });
-
-      // Connect after setting up close handler
-      mcpInstance.server.connect(transport).then(() => {
-        console.log('✅ SSE connection established with Dust');
-      }).catch((err) => {
-        console.error('❌ Connect error:', err);
-        resolve();
-      });
-    });
-
-  } catch (error: any) {
-    console.error('❌ MCP Error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
-    }
-  }
+// ✅ CHANGEMENT 6 : Route POST /mcp pour le protocole MCP
+app.post("/mcp", async (req, res) => {
+  console.log("📬 Incoming MCP request from Dust");
+  await transport.handleRequest(req, res, req.body);
 });
 
-// Démarrage du serveur
+// ========================================
+// START SERVER
+// ========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ MCP Server listening on port ${PORT}`);
+  console.log(`🚀 MCP Server running on port ${PORT}`);
+  console.log(`📍 Health: http://localhost:${PORT}/`);
+  console.log(`📡 MCP: http://localhost:${PORT}/mcp`);
 });

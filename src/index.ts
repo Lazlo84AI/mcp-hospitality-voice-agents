@@ -736,7 +736,6 @@ app.get('/mcp', async (req, res) => {
   console.log('📡 Incoming SSE connection from Dust...');
   
   try {
-
     const mcpInstance = new HospitalityMCP({
       SUPABASE_URL: process.env.SUPABASE_URL!,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -748,12 +747,22 @@ app.get('/mcp', async (req, res) => {
 
     // Transport SSE
     const transport = new SSEServerTransport('/mcp', res);
-    await mcpInstance.server.connect(transport);
+    
+    // Keep connection alive - wait for close event
+    await new Promise<void>((resolve) => {
+      req.on('close', async () => {
+        console.log('🔌 Dust SSE connection closed');
+        await mcpInstance.server.close();
+        resolve();
+      });
 
-    console.log('✅ SSE connection established with Dust');
-
-    req.on('close', () => {
-      console.log('🔌 Dust SSE connection closed');
+      // Connect after setting up close handler
+      mcpInstance.server.connect(transport).then(() => {
+        console.log('✅ SSE connection established with Dust');
+      }).catch((err) => {
+        console.error('❌ Connect error:', err);
+        resolve();
+      });
     });
 
   } catch (error: any) {

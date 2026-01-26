@@ -136,6 +136,21 @@ app.get('/health', async (req: Request, res: Response) => {
   }
 });
 
+// GET endpoint for health check / discovery
+app.get('/mcp', (req: Request, res: Response) => {
+  console.log('📍 GET /mcp - Health check');
+  res.status(200).json({
+    protocol: 'mcp',
+    version: '2024-11-05',
+    transport: 'http-post',
+    status: 'ready',
+    serverInfo: {
+      name: 'mcp-hospitality',
+      version: '3.0.0'
+    }
+  });
+});
+
 // MCP endpoint - POST (Tool invocation via JSON-RPC)
 app.post('/mcp', async (req: Request, res: Response) => {
   try {
@@ -171,6 +186,13 @@ app.post('/mcp', async (req: Request, res: Response) => {
           }
         };
         break;
+
+      case 'notifications/initialized':   // ← AJOUTE CE CASE ICI
+        // Notification from client that initialization is complete
+        console.log('📢 Received notifications/initialized from client');
+        // Notifications don't require a response according to JSON-RPC 2.0
+        res.status(200).send();
+        return;
 
       case 'tools/list':
         result = {

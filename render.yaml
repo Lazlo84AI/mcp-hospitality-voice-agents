@@ -1,0 +1,61 @@
+# ========================================
+# RENDER DEPLOYMENT CONFIGURATION
+# ========================================
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: mcp-hospitality-server
+    runtime: node
+    region: frankfurt  # EU region (closest to your Supabase)
+    plan: starter      # $7/month - 512MB RAM, 0.5 CPU
+    
+    # Build Configuration
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    
+    # Auto-deploy from GitHub
+    autoDeploy: true
+    
+    # Health Check (required by Render)
+    healthCheckPath: /health
+    
+    # Environment Variables
+    # ⚠️ Add sensitive values manually in Render Dashboard
+    envVars:
+      - key: NODE_ENV
+        value: production
+      
+      - key: PORT
+        value: 3000
+      
+      # ⚠️ TO BE CONFIGURED IN RENDER DASHBOARD
+      - key: SUPABASE_URL
+        sync: false
+      
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      
+      - key: ELEVENLABS_AGENT_ID
+        sync: false
+    
+    # Scaling (optional)
+    # numInstances: 1
+    # maxInstances: 3
+    
+    # Custom Domains (optional)
+    # domains:
+    #   - mcp.hospitalityos.com
+
+# ========================================
+# DEPLOYMENT NOTES
+# ========================================
+# 1. Connect your GitHub repository to Render
+# 2. Render will auto-detect this file
+# 3. Add environment variables manually in Dashboard
+# 4. Deploy will trigger automatically on git push
+# 5. Your MCP server URL will be:
+#    https://mcp-hospitality-server.onrender.com

@@ -142,7 +142,6 @@ app.post('/mcp', async (req: Request, res: Response) => {
     console.log('📬 Incoming MCP request from Dust');
     console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
     
-    // Dust envoie des requêtes au format JSON-RPC 2.0
     const { method, params, id } = req.body;
     
     if (!method) {
@@ -156,16 +155,190 @@ app.post('/mcp', async (req: Request, res: Response) => {
       });
     }
 
-    // Pour l'instant, on retourne une réponse basique
-    // L'intégration complète avec le MCP server viendra ensuite
+    // Gestion des méthodes MCP selon le protocole
+    let result: any;
+
+    switch (method) {
+      case 'initialize':
+        result = {
+          protocolVersion: '2025-06-18',
+          capabilities: {
+            tools: {}
+          },
+          serverInfo: {
+            name: 'mcp-hospitality',
+            version: '3.0.0'
+          }
+        };
+        break;
+
+      case 'tools/list':
+        result = {
+          tools: [
+            {
+              name: 'test_supabase',
+              description: 'Test Supabase database connection',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+                required: []
+              }
+            },
+            {
+              name: 'get_all_staff',
+              description: 'Retrieve all active staff members from HospitalityOS',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+                required: []
+              }
+            },
+            {
+              name: 'get_all_locations',
+              description: 'Retrieve all active locations (rooms, areas) from HospitalityOS',
+              inputSchema: {
+                type: 'object',
+                properties: {},
+                required: []
+              }
+            },
+            {
+              name: 'verify_staff_identity',
+              description: 'Verify staff member identity by UUID',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  staff_id: { type: 'string', description: 'Staff UUID' }
+                },
+                required: ['staff_id']
+              }
+            },
+            {
+              name: 'verify_location',
+              description: 'Verify location by UUID',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  location_id: { type: 'string', description: 'Location UUID' }
+                },
+                required: ['location_id']
+              }
+            },
+            {
+              name: 'ask_clarification',
+              description: 'Ask for clarification via ElevenLabs voice',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  question: { type: 'string' },
+                  suggestions: { type: 'array', items: { type: 'string' } },
+                  context: { type: 'string' },
+                  conversation_id: { type: 'string' }
+                },
+                required: ['question', 'context', 'conversation_id']
+              }
+            },
+            {
+              name: 'create_task_report',
+              description: 'Create a task report in HospitalityOS',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  staff_id: { type: 'string' },
+                  location: { type: 'string' },
+                  location_id: { type: 'string' },
+                  title: { type: 'string' },
+                  description: { type: 'string' },
+                  category: { type: 'string', enum: ['client_request', 'incident', 'internal_task'] },
+                  priority: { type: 'string', enum: ['normal', 'urgent'] },
+                  guest_name: { type: 'string' },
+                  voice_note_url: { type: 'string' },
+                  voice_transcript: { type: 'string' },
+                  conversation_id: { type: 'string' }
+                },
+                required: ['staff_id', 'location', 'title', 'description', 'category']
+              }
+            }
+          ]
+        };
+        break;
+
+      case 'tools/call':
+        // Appel d'un outil spécifique
+        const toolName = params?.name;
+        const toolArgs = params?.arguments || {};
+
+        if (!toolName) {
+          return res.status(400).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32602,
+              message: 'Invalid params: tool name is required'
+            },
+            id: id
+          });
+        }
+
+        // Appel de la fonction correspondante dans mcpAgent
+        let toolResult: any;
+        
+        switch (toolName) {
+          case 'test_supabase':
+            toolResult = await mcpAgent.testSupabase();
+            break;
+          case 'get_all_staff':
+            toolResult = await mcpAgent.getAllStaff();
+            break;
+          case 'get_all_locations':
+            toolResult = await mcpAgent.getAllLocations();
+            break;
+          case 'verify_staff_identity':
+            toolResult = await mcpAgent.verifyStaff(toolArgs.staff_id);
+            break;
+          case 'verify_location':
+            toolResult = await mcpAgent.verifyLocation(toolArgs.location_id);
+            break;
+          case 'ask_clarification':
+            toolResult = await mcpAgent.askClarification(toolArgs);
+            break;
+          case 'create_task_report':
+            toolResult = await mcpAgent.createTaskReport(toolArgs);
+            break;
+          default:
+            return res.status(400).json({
+              jsonrpc: '2.0',
+              error: {
+                code: -32601,
+                message: `Unknown tool: ${toolName}`
+              },
+              id: id
+            });
+        }
+
+        result = {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(toolResult, null, 2)
+            }
+          ]
+        };
+        break;
+
+      default:
+        return res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32601,
+            message: `Method not found: ${method}`
+          },
+          id: id
+        });
+    }
+
     res.json({
       jsonrpc: '2.0',
-      result: {
-        status: 'received',
-        method: method,
-        params: params,
-        message: 'MCP endpoint is operational, full integration pending'
-      },
+      result: result,
       id: id
     });
     

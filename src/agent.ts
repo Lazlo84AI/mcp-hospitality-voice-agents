@@ -316,7 +316,7 @@ export class HospitalityMCP {
       {
         staff_id: z.string().describe("UUID du membre du staff")
       },
-      async (params) => {
+      async (params: { staff_id: string }) => {
         try {
           console.log("🔍 Verifying staff by UUID:", params.staff_id);
 
@@ -382,7 +382,7 @@ export class HospitalityMCP {
       {
         location_id: z.string().describe("UUID de la localisation")
       },
-      async (params) => {
+      async (params: { location_id: string }) => {
         try {
           console.log("📍 Verifying location by UUID:", params.location_id);
 
@@ -450,7 +450,12 @@ export class HospitalityMCP {
         context: z.enum(["staff_identity", "location", "task_details", "priority", "other"]).describe("Type de clarification demandée"),
         conversation_id: z.string().describe("ID de conversation ElevenLabs (pour traçabilité)")
       },
-      async (params) => {
+      async (params: {
+        question: string;
+        suggestions?: string[];
+        context: string;
+        conversation_id: string;
+     }) => {
         try {
           console.log("❓ Asking for clarification:", params.context);
 
@@ -527,7 +532,19 @@ export class HospitalityMCP {
         voice_transcript: z.string().optional().describe("Transcription vocale complète"),
         conversation_id: z.string().optional().describe("ID de conversation ElevenLabs (pour traçabilité et anti-doublon)")
       },
-      async (params) => {
+      async (params: {
+  staff_id: string;
+  location: string;
+  location_id?: string;
+  title: string;
+  description: string;
+  category: "client_request" | "incident" | "internal_task";
+  priority?: "normal" | "urgent";
+  guest_name?: string;
+  voice_note_url?: string;
+  voice_transcript?: string;
+  conversation_id?: string;
+}) => {
         try {
           console.log("💾 Creating task report...");
 

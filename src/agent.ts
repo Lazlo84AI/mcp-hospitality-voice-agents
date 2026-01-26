@@ -721,4 +721,378 @@ export class HospitalityMCP {
       }
     );
   }
+ // ========================================
+  // MÉTHODES PUBLIQUES POUR APPELS DIRECTS
+  // ========================================
+
+  async testSupabase() {
+    try {
+      console.log("🧪 Testing Supabase connection...");
+
+      const { data, error } = await this.supabase
+        .from("staff_directory")
+        .select("id, full_name, role")
+        .eq("is_active", true)
+        .limit(1);
+
+      if (error) {
+        console.error("❌ Supabase test failed:", error.message);
+        return {
+          status: "error",
+          message: error.message
+        };
+      }
+
+      console.log("✅ Supabase test successful");
+      return {
+        status: "success",
+        message: `Connexion Supabase OK! Found ${data?.length || 0} active staff member(s)`
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return {
+        status: "error",
+        message: err.message
+      };
+    }
+  }
+
+  async getAllStaff() {
+    try {
+      console.log("📋 Fetching all active staff...");
+
+      const { data, error } = await this.supabase
+        .from("staff_directory")
+        .select("id, full_name, first_name, last_name, role, department, service, job_title")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true });
+
+      if (error) {
+        console.error("❌ Supabase error:", error.message);
+        return {
+          status: "error",
+          message: error.message
+        };
+      }
+
+      console.log(`✅ Found ${data.length} active staff members`);
+
+      const formattedStaff = data.map((staff: any) => ({
+        id: staff.id,
+        name: `${staff.first_name} ${staff.last_name}`,
+        first_name: staff.first_name,
+        last_name: staff.last_name,
+        role: staff.job_title || staff.role,
+        service: staff.service || staff.department
+      }));
+
+      return {
+        status: "success",
+        total_count: data.length,
+        staff: formattedStaff
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return {
+        status: "error",
+        message: err.message
+      };
+    }
+  }
+
+  async getAllLocations() {
+    try {
+      console.log("📋 Fetching all active locations...");
+
+      const { data, error } = await this.supabase
+        .from("locations")
+        .select("id, name, display_name, location_code, floor, type, location_type, building")
+        .eq("is_active", true)
+        .order("floor", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("❌ Supabase error:", error.message);
+        return {
+          status: "error",
+          message: error.message
+        };
+      }
+
+      console.log(`✅ Found ${data.length} active locations`);
+
+      const formattedLocations = data.map((loc: any) => ({
+        id: loc.id,
+        name: loc.display_name || loc.name,
+        location_code: loc.location_code,
+        floor: loc.floor,
+        type: loc.location_type || loc.type
+      }));
+
+      return {
+        status: "success",
+        total_count: data.length,
+        locations: formattedLocations
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return {
+        status: "error",
+        message: err.message
+      };
+    }
+  }
+
+  async verifyStaff(staff_id: string) {
+    try {
+      console.log("🔍 Verifying staff by UUID:", staff_id);
+
+      const { data, error } = await this.supabase
+        .from("staff_directory")
+        .select("id, full_name, first_name, last_name, email, role, department, service, job_title, hierarchy")
+        .eq("id", staff_id)
+        .eq("is_active", true)
+        .single();
+
+      if (error || !data) {
+        console.error("❌ Staff not found:", staff_id);
+        return {
+          error: `Aucun membre du staff actif trouvé avec l'ID: ${staff_id}`
+        };
+      }
+
+      console.log("✅ Staff verified:", `${data.first_name} ${data.last_name}`);
+
+      return {
+        staff_verified: true,
+        staff_id: data.id,
+        staff_name: `${data.first_name} ${data.last_name}`,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        staff_role: data.job_title || data.role,
+        staff_department: data.service || data.department,
+        email: data.email
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return { error: err.message };
+    }
+  }
+
+  async verifyLocation(location_id: string) {
+    try {
+      console.log("📍 Verifying location by UUID:", location_id);
+
+      const { data, error } = await this.supabase
+        .from("locations")
+        .select("id, name, display_name, location_code, type, location_type, floor, building, capacity, metadata")
+        .eq("id", location_id)
+        .eq("is_active", true)
+        .single();
+
+      if (error || !data) {
+        console.error("❌ Location not found:", location_id);
+        return {
+          error: `Aucune localisation active trouvée avec l'ID: ${location_id}`
+        };
+      }
+
+      console.log("✅ Location verified:", data.display_name || data.name);
+
+      return {
+        location_verified: true,
+        location_id: data.id,
+        location_name: data.display_name || data.name,
+        location_code: data.location_code,
+        floor: data.floor,
+        location_type: data.location_type || data.type,
+        building: data.building
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return { error: err.message };
+    }
+  }
+
+  async askClarification(params: {
+    question: string;
+    suggestions?: string[];
+    context: string;
+    conversation_id: string;
+  }) {
+    try {
+      console.log("❓ Asking for clarification:", params.context);
+
+      const { question, suggestions = [], conversation_id } = params;
+
+      let formatted_response = question;
+      
+      if (suggestions.length > 0) {
+        formatted_response += ` Options : ${suggestions.join(' ou ')}.`;
+      }
+
+      const elevenlabs_notified = await this.sendToElevenLabs(
+        formatted_response,
+        conversation_id
+      );
+
+      return {
+        status: "clarification_sent",
+        question: question,
+        suggestions: suggestions,
+        context: params.context,
+        formatted_response: formatted_response,
+        conversation_id: conversation_id,
+        elevenlabs_notified: elevenlabs_notified,
+        instruction: "Clarification envoyée à ElevenLabs. Attendre la réponse utilisateur."
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return {
+        status: "error",
+        error: err.message
+      };
+    }
+  }
+
+  async createTaskReport(params: {
+    staff_id: string;
+    location: string;
+    location_id?: string;
+    title: string;
+    description: string;
+    category: "client_request" | "incident" | "internal_task";
+    priority?: "normal" | "urgent";
+    guest_name?: string;
+    voice_note_url?: string;
+    voice_transcript?: string;
+    conversation_id?: string;
+  }) {
+    try {
+      console.log("💾 Creating task report...");
+
+      if (!params.staff_id) {
+        console.error("❌ Missing staff_id");
+        return {
+          status: "error",
+          error: "Le staff_id est obligatoire pour créer un rapport"
+        };
+      }
+
+      if (!params.location) {
+        console.error("❌ Missing location");
+        return {
+          status: "error",
+          error: "La localisation (location) est obligatoire"
+        };
+      }
+
+      // Détection de doublon
+      if (params.conversation_id) {
+        const { data: existingTask } = await this.supabase
+          .from("task")
+          .select("id, title, created_at")
+          .eq("voice_conversation_id", params.conversation_id)
+          .single();
+        
+        if (existingTask) {
+          console.warn("⚠️ Duplicate task detected for conversation:", params.conversation_id);
+          return {
+            status: "duplicate",
+            task_id: existingTask.id,
+            message: "Tâche déjà créée pour cette conversation",
+            task_title: existingTask.title
+          };
+        }
+      }
+
+      // Récupération du nom complet du staff
+      const { data: staffData } = await this.supabase
+        .from("staff_directory")
+        .select("first_name, last_name, full_name")
+        .eq("id", params.staff_id)
+        .single();
+
+      const staff_full_name = staffData 
+        ? `${staffData.first_name} ${staffData.last_name}`
+        : "Staff inconnu";
+
+      // Insertion dans Supabase
+      const { data, error } = await this.supabase
+        .from("task")
+        .insert({
+          title: params.title,
+          description: params.description,
+          origin_type: "team",
+          created_by: params.staff_id,
+          assigned_to: ["75d4096b-55b5-40c1-a593-0e7daecd8c64"],
+          location: params.location,
+          location_id: params.location_id || null,
+          category: params.category,
+          priority: params.priority || "normal",
+          service: "housekeeping",
+          status: "pending",
+          guest_name: params.guest_name || null,
+          voice_note_url: params.voice_note_url || null,
+          voice_transcript: params.voice_transcript || params.description,
+          voice_conversation_id: params.conversation_id || null,
+          requires_validation: false,
+          created_at: new Date().toISOString()
+        })
+        .select("id, title, location, status, priority, category, created_by, created_at")
+        .single();
+
+      if (error) {
+        console.error("❌ Supabase insert error:", error.message);
+        return {
+          status: "error",
+          error: `Erreur lors de la création du rapport: ${error.message}`
+        };
+      }
+
+      console.log("✅ Task report created:", data.id);
+
+      // Envoi à ElevenLabs
+      let elevenlabs_notified = false;
+      if (params.conversation_id) {
+        const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. L'équipe ${data.category === 'incident' ? 'maintenance' : 'housekeeping'} a été notifiée immédiatement. Bonne journée !`;
+        
+        elevenlabs_notified = await this.sendToElevenLabs(
+          confirmationMessage,
+          params.conversation_id
+        );
+      }
+
+      return {
+        status: "success",
+        task_created: true,
+        task_id: data.id,
+        task_details: {
+          title: data.title,
+          location: data.location,
+          priority: data.priority,
+          staff_name: staff_full_name,
+          category: data.category,
+          status: data.status,
+          created_at: data.created_at
+        },
+        conversation_id: params.conversation_id,
+        elevenlabs_notified: elevenlabs_notified,
+        message: `Tâche ${data.priority} enregistrée avec succès !`
+      };
+
+    } catch (err: any) {
+      console.error("❌ Unexpected error:", err.message);
+      return {
+        status: "error",
+        error: err.message
+      };
+    }
+  } 
 }

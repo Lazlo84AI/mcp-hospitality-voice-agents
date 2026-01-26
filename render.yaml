@@ -5,7 +5,7 @@
 
 services:
   - type: web
-    name: mcp-hospitality-server
+    name: mcp-hospitality-voice-agents
     runtime: node
     region: frankfurt  # EU region (closest to your Supabase)
     plan: starter      # $7/month - 512MB RAM, 0.5 CPU
@@ -58,4 +58,4 @@ services:
 # 3. Add environment variables manually in Dashboard
 # 4. Deploy will trigger automatically on git push
 # 5. Your MCP server URL will be:
-#    https://mcp-hospitality-server.onrender.com
+#    https://mcp-hospitality-voice-agents.onrender.com

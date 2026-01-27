@@ -51,50 +51,61 @@ export class HospitalityMCP {
   // ========================================
   // FONCTION PRIVÉE : Envoyer un message à ElevenLabs
   // ========================================
-  private async sendToElevenLabs(
-    message: string, 
-    conversationId: string
-  ): Promise<boolean> {
-    try {
-      // Vérifier que les credentials ElevenLabs sont disponibles
-      if (!this.env.ELEVENLABS_API_KEY || !this.env.ELEVENLABS_AGENT_ID) {
-        console.warn("⚠️ ElevenLabs credentials missing, skipping notification");
-        return false;
-      }
-
-      console.log(`📤 Sending message to ElevenLabs (conversation: ${conversationId})...`);
-
-      const response = await fetch(
-        `https://api.elevenlabs.io/v1/convai/conversation/send_message`,
-        {
-          method: "POST",
-          headers: {
-            "xi-api-key": this.env.ELEVENLABS_API_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agent_id: this.env.ELEVENLABS_AGENT_ID,
-            conversation_id: conversationId,
-            message: message
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ ElevenLabs API error:", response.status, errorText);
-        return false;
-      }
-
-      const result = await response.json();
-      console.log("✅ Message sent to ElevenLabs:", result);
-      return true;
-
-    } catch (err: any) {
-      console.error("❌ Failed to send to ElevenLabs:", err.message);
+private async sendToElevenLabs(
+  message: string, 
+  conversationId: string
+): Promise<boolean> {
+  try {
+    // Vérifier que les credentials ElevenLabs sont disponibles
+    if (!this.env.ELEVENLABS_API_KEY || !this.env.ELEVENLABS_AGENT_ID) {
+      console.warn("⚠️ ElevenLabs credentials missing, skipping notification");
       return false;
     }
+
+    console.log(`📤 Sending message to ElevenLabs (conversation: ${conversationId})...`);
+    console.log(`📝 Message content: "${message}"`);
+
+    // ✅ ENDPOINT CORRIGÉ
+    const url = `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/messages`;
+    
+    console.log(`🔗 API URL: ${url}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": this.env.ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        // ✅ BODY CORRIGÉ (conversation_id retiré, il est dans l'URL)
+        text: message,  // ou "message" selon la doc ElevenLabs
+        role: "agent"   // ou "assistant"
+      }),
+    });
+
+    // ✅ GESTION D'ERREUR AMÉLIORÉE
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ ElevenLabs API error:");
+      console.error(`   Status: ${response.status} ${response.statusText}`);
+      console.error(`   Body: ${errorText}`);
+      console.error(`   URL: ${url}`);
+      console.error(`   Headers: ${JSON.stringify(response.headers)}`);
+      return false;
+    }
+
+    const result = await response.json();
+    console.log("✅ Message sent to ElevenLabs successfully!");
+    console.log("📦 Response:", JSON.stringify(result, null, 2));
+    return true;
+
+  } catch (err: any) {
+    console.error("❌ Failed to send to ElevenLabs:");
+    console.error(`   Error: ${err.message}`);
+    console.error(`   Stack: ${err.stack}`);
+    return false;
   }
+}
 
   // ========================================
   // INITIALISATION : Enregistrement des 7 outils

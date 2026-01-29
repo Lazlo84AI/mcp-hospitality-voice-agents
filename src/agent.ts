@@ -48,64 +48,7 @@ export class HospitalityMCP {
     console.log("✅ Supabase client initialized for HospitalityOS");
   }
 
-  // ========================================
-  // FONCTION PRIVÉE : Envoyer un message à ElevenLabs
-  // ========================================
-private async sendToElevenLabs(
-  message: string, 
-  conversationId: string
-): Promise<boolean> {
-  try {
-    // Vérifier que les credentials ElevenLabs sont disponibles
-    if (!this.env.ELEVENLABS_API_KEY || !this.env.ELEVENLABS_AGENT_ID) {
-      console.warn("⚠️ ElevenLabs credentials missing, skipping notification");
-      return false;
-    }
 
-    console.log(`📤 Sending message to ElevenLabs (conversation: ${conversationId})...`);
-    console.log(`📝 Message content: "${message}"`);
-
-    // ✅ ENDPOINT CORRIGÉ
-    const url = `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/messages`;
-    
-    console.log(`🔗 API URL: ${url}`);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "xi-api-key": this.env.ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        // ✅ BODY CORRIGÉ (conversation_id retiré, il est dans l'URL)
-        text: message,  // ou "message" selon la doc ElevenLabs
-        role: "agent"   // ou "assistant"
-      }),
-    });
-
-    // ✅ GESTION D'ERREUR AMÉLIORÉE
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ ElevenLabs API error:");
-      console.error(`   Status: ${response.status} ${response.statusText}`);
-      console.error(`   Body: ${errorText}`);
-      console.error(`   URL: ${url}`);
-      console.error(`   Headers: ${JSON.stringify(response.headers)}`);
-      return false;
-    }
-
-    const result = await response.json();
-    console.log("✅ Message sent to ElevenLabs successfully!");
-    console.log("📦 Response:", JSON.stringify(result, null, 2));
-    return true;
-
-  } catch (err: any) {
-    console.error("❌ Failed to send to ElevenLabs:");
-    console.error(`   Error: ${err.message}`);
-    console.error(`   Stack: ${err.stack}`);
-    return false;
-  }
-}
 
   // ========================================
   // INITIALISATION : Enregistrement des 7 outils
@@ -931,46 +874,46 @@ private async sendToElevenLabs(
   }
 
   async askClarification(params: {
-    question: string;
-    suggestions?: string[];
-    context: string;
-    conversation_id: string;
-  }) {
-    try {
-      console.log("❓ Asking for clarification:", params.context);
+  question: string;
+  suggestions?: string[];
+  context: string;
+  conversation_id: string;
+}) {
+  try {
+    console.log("❓ Asking for clarification:", params.context);
 
-      const { question, suggestions = [], conversation_id } = params;
+    const { question, suggestions = [], conversation_id } = params;
 
-      let formatted_response = question;
-      
-      if (suggestions.length > 0) {
-        formatted_response += ` Options : ${suggestions.join(' ou ')}.`;
-      }
-
-      const elevenlabs_notified = await this.sendToElevenLabs(
-        formatted_response,
-        conversation_id
-      );
-
-      return {
-        status: "clarification_sent",
-        question: question,
-        suggestions: suggestions,
-        context: params.context,
-        formatted_response: formatted_response,
-        conversation_id: conversation_id,
-        elevenlabs_notified: elevenlabs_notified,
-        instruction: "Clarification envoyée à ElevenLabs. Attendre la réponse utilisateur."
-      };
-
-    } catch (err: any) {
-      console.error("❌ Unexpected error:", err.message);
-      return {
-        status: "error",
-        error: err.message
-      };
+    let formatted_response = question;
+    
+    if (suggestions.length > 0) {
+      formatted_response += ` Options : ${suggestions.join(' ou ')}.`;
     }
+
+    // ✅ MODIFICATION : Plus d'appel à sendToElevenLabs
+    // La réponse sera gérée par le retour HTTP du webhook Dust
+    console.log(`📤 Clarification prepared: "${formatted_response}"`);
+    console.log(`📝 Conversation ID: ${conversation_id}`);
+
+    return {
+      status: "clarification_sent",
+      question: question,
+      suggestions: suggestions,
+      context: params.context,
+      formatted_response: formatted_response,
+      conversation_id: conversation_id,
+      elevenlabs_notified: true, // ✅ Toujours true (géré par Dust)
+      instruction: "Clarification envoyée. Attendre la réponse utilisateur."
+    };
+
+  } catch (err: any) {
+    console.error("❌ Unexpected error:", err.message);
+    return {
+      status: "error",
+      error: err.message
+    };
   }
+}
 
   async createTaskReport(params: {
     staff_id: string;
@@ -1069,34 +1012,35 @@ private async sendToElevenLabs(
 
       console.log("✅ Task report created:", data.id);
 
-      // Envoi à ElevenLabs
-      let elevenlabs_notified = false;
-      if (params.conversation_id) {
-        const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. L'équipe ${data.category === 'incident' ? 'maintenance' : 'housekeeping'} a été notifiée immédiatement. Bonne journée !`;
-        
-        elevenlabs_notified = await this.sendToElevenLabs(
-          confirmationMessage,
-          params.conversation_id
-        );
-      }
+      // ✅ MODIFICATION : Confirmation préparée (sans appel ElevenLabs)
+let elevenlabs_notified = false;
+if (params.conversation_id) {
+  const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. L'équipe ${data.category === 'incident' ? 'maintenance' : 'housekeeping'} a été notifiée immédiatement. Bonne journée !`;
+  
+  console.log(`📤 Confirmation prepared: "${confirmationMessage}"`);
+  console.log(`📝 Conversation ID: ${params.conversation_id}`);
+  
+  // ✅ Plus d'appel à sendToElevenLabs (géré par Dust)
+  elevenlabs_notified = true;
+}
 
-      return {
-        status: "success",
-        task_created: true,
-        task_id: data.id,
-        task_details: {
-          title: data.title,
-          location: data.location,
-          priority: data.priority,
-          staff_name: staff_full_name,
-          category: data.category,
-          status: data.status,
-          created_at: data.created_at
-        },
-        conversation_id: params.conversation_id,
-        elevenlabs_notified: elevenlabs_notified,
-        message: `Tâche ${data.priority} enregistrée avec succès !`
-      };
+return {
+  status: "success",
+  task_created: true,
+  task_id: data.id,
+  task_details: {
+    title: data.title,
+    location: data.location,
+    priority: data.priority,
+    staff_name: staff_full_name,
+    category: data.category,
+    status: data.status,
+    created_at: data.created_at
+  },
+  conversation_id: params.conversation_id,
+  elevenlabs_notified: elevenlabs_notified, // ✅ Toujours true
+  message: `Tâche ${data.priority} enregistrée avec succès !`
+};
 
     } catch (err: any) {
       console.error("❌ Unexpected error:", err.message);

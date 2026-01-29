@@ -422,28 +422,25 @@ export class HospitalityMCP {
             formatted_response += ` Options : ${suggestions.join(' ou ')}.`;
           }
 
-          // Envoi à ElevenLabs via API REST HTTP
-          const elevenlabs_notified = await this.sendToElevenLabs(
-            formatted_response,
-            conversation_id
-          );
+          // ✅ Clarification préparée (géré par Dust via HTTP response)
+console.log(`📤 Clarification prepared: "${formatted_response}"`);
+console.log(`📝 Conversation ID: ${conversation_id}`);
 
-          // Retourne la réponse à Dust
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify({
-                status: "clarification_sent",
-                question: question,
-                suggestions: suggestions,
-                context: params.context,
-                formatted_response: formatted_response,
-                conversation_id: conversation_id,
-                elevenlabs_notified: elevenlabs_notified,
-                instruction: "Clarification envoyée à ElevenLabs. Attendre la réponse utilisateur."
-              })
-            }]
-          };
+return {
+  content: [{
+    type: "text",
+    text: JSON.stringify({
+      status: "clarification_sent",
+      question: question,
+      suggestions: suggestions,
+      context: params.context,
+      formatted_response: formatted_response,
+      conversation_id: conversation_id,
+      elevenlabs_notified: true, // ✅ Toujours true (géré par Dust)
+      instruction: "Clarification envoyée. Attendre la réponse utilisateur."
+    })
+  }]
+};
 
         } catch (err: any) {
           console.error("❌ Unexpected error:", err.message);
@@ -621,17 +618,19 @@ export class HospitalityMCP {
           console.log("✅ Task report created:", data.id);
 
           // ========================================
-          // ENVOI À ELEVENLABS VIA API REST HTTP
+          // CONFIRMATION PRÉPARÉE (géré par Dust via HTTP response)
           // ========================================
           let elevenlabs_notified = false;
           if (params.conversation_id) {
             const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. L'équipe ${data.category === 'incident' ? 'maintenance' : 'housekeeping'} a été notifiée immédiatement. Bonne journée !`;
-            
-            elevenlabs_notified = await this.sendToElevenLabs(
-              confirmationMessage,
-              params.conversation_id
-            );
-          }
+  
+          console.log(`📤 Confirmation prepared: "${confirmationMessage}"`);
+          console.log(`📝 Conversation ID: ${params.conversation_id}`);
+  
+          // ✅ Plus d'appel à sendToElevenLabs (géré par Dust)
+          elevenlabs_notified = true;
+         }
+          
 
           // ========================================
           // RETOUR ENRICHI AVEC TOUTES LES DONNÉES

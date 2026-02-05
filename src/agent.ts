@@ -470,6 +470,7 @@ return {
         staff_id: z.string().describe("UUID du membre du staff qui fait le rapport"),
         location: z.string().describe("Localisation (nom de la chambre ou zone) - OBLIGATOIRE"),
         location_id: z.string().optional().describe("UUID de la localisation si disponible"),
+        assigned_to: z.array(z.string()).optional().describe("Array of staff UUIDs to assign the task to"),
         title: z.string().describe("Titre court du rapport"),
         description: z.string().describe("Description détaillée du rapport"),
         category: z.enum([
@@ -487,6 +488,7 @@ return {
   staff_id: string;
   location: string;
   location_id?: string;
+  assigned_to?: string[];
   title: string;
   description: string;
   category: "client_request" | "incident" | "internal_task";

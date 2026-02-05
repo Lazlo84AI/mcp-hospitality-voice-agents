@@ -269,6 +269,11 @@ app.post('/mcp', async (req: Request, res: Response) => {
                   staff_id: { type: 'string' },
                   location: { type: 'string' },
                   location_id: { type: 'string' },
+                   assigned_to: { 
+                      type: 'array', 
+                      items: { type: 'string' },
+                      description: 'Array of staff UUIDs to assign the task to (from staff_directory)'
+                    },
                   title: { type: 'string' },
                   description: { type: 'string' },
                   category: { type: 'string', enum: ['client_request', 'incident', 'internal_task'] },

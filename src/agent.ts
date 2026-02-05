@@ -580,7 +580,7 @@ return {
               description: params.description,
               origin_type: "team",
               created_by: params.staff_id,
-              assigned_to: ["75d4096b-55b5-40c1-a593-0e7daecd8c64"], // Océane (chef gouvernantes)
+              assigned_to: params.assigned_to || ["75d4096b-55b5-40c1-a593-0e7daecd8c64"], // Utilise le paramètre, fallback Océane
               location: params.location,
               location_id: params.location_id || null,
               category: params.category,
@@ -647,6 +647,7 @@ return {
                   location: data.location,
                   priority: data.priority,
                   staff_name: staff_full_name,
+                  assigned_to_name: assigned_to_name,
                   category: data.category,
                   status: data.status,
                   created_at: data.created_at
@@ -918,6 +919,7 @@ return {
     staff_id: string;
     location: string;
     location_id?: string;
+    assigned_to?: string[];
     title: string;
     description: string;
     category: "client_request" | "incident" | "internal_task";
@@ -976,6 +978,18 @@ return {
         ? `${staffData.first_name} ${staffData.last_name}`
         : "Staff inconnu";
 
+      // Récupération du nom de la personne assignée pour la confirmation
+      const assigned_to_id = params.assigned_to?.[0] || "75d4096b-55b5-40c1-a593-0e7daecd8c64";
+      const { data: assignedData } = await this.supabase
+        .from("staff_directory")
+        .select("first_name, last_name")
+        .eq("id", assigned_to_id)
+        .single();
+
+      const assigned_to_name = assignedData 
+        ? `${assignedData.first_name} ${assignedData.last_name}`
+        : "Océane";  
+
       // Insertion dans Supabase
       const { data, error } = await this.supabase
         .from("task")
@@ -984,7 +998,7 @@ return {
           description: params.description,
           origin_type: "team",
           created_by: params.staff_id,
-          assigned_to: ["75d4096b-55b5-40c1-a593-0e7daecd8c64"],
+          assigned_to: params.assigned_to || ["75d4096b-55b5-40c1-a593-0e7daecd8c64"],
           location: params.location,
           location_id: params.location_id || null,
           category: params.category,
@@ -1014,7 +1028,7 @@ return {
       // ✅ MODIFICATION : Confirmation préparée (sans appel ElevenLabs)
 let elevenlabs_notified = false;
 if (params.conversation_id) {
-  const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. L'équipe ${data.category === 'incident' ? 'maintenance' : 'housekeeping'} a été notifiée immédiatement. Bonne journée !`;
+  const confirmationMessage = `Sokle a bien enregistré : ${staff_full_name}, ${params.location}, ${params.title}, ${params.priority}. ${assigned_to_name} a été notifié immédiatement. Bonne journée !`;
   
   console.log(`📤 Confirmation prepared: "${confirmationMessage}"`);
   console.log(`📝 Conversation ID: ${params.conversation_id}`);
@@ -1032,6 +1046,7 @@ return {
     location: data.location,
     priority: data.priority,
     staff_name: staff_full_name,
+     assigned_to_name: assigned_to_name,
     category: data.category,
     status: data.status,
     created_at: data.created_at

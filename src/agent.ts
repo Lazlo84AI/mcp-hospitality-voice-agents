@@ -571,6 +571,19 @@ return {
             ? `${staffData.first_name} ${staffData.last_name}`
             : "Staff inconnu";
 
+            const assigned_to_id = params.assigned_to?.[0] || "75d4096b-55b5-40c1-a593-0e7daecd8c64";
+            const { data: assignedData } = await this.supabase
+             .from("staff_directory")
+             .select("first_name, last_name")
+             .eq("id", assigned_to_id)
+             .single();
+
+            const assigned_to_name = assignedData 
+              ? `${assignedData.first_name} ${assignedData.last_name}`
+              : "Océane";
+
+
+            
           // ========================================
           // INSERTION DANS SUPABASE
           // ========================================
@@ -1048,7 +1061,7 @@ return {
     location: data.location,
     priority: data.priority,
     staff_name: staff_full_name,
-     assigned_to_name: assigned_to_name,
+    assigned_to_name: assigned_to_name,
     category: data.category,
     status: data.status,
     created_at: data.created_at
